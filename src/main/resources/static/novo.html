@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Novo usuário</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<main>
+  <div class="topo">
+    <h1>Novo usuário</h1>
+    <a href="index.html"><button type="button" class="secundario">Voltar</button></a>
+  </div>
+
+  <div id="faixa" class="faixa erro" hidden></div>
+
+  <form id="formulario" novalidate>
+    <div class="campo campo-largo">
+      <label for="name">Nome</label>
+      <input type="text" id="name" name="name" maxlength="120">
+      <span class="mensagem-campo" data-erro="name"></span>
+    </div>
+
+    <div class="campo">
+      <label for="birthDate">Data de nascimento</label>
+      <input type="date" id="birthDate" name="birthDate">
+      <span class="mensagem-campo" data-erro="birthDate"></span>
+    </div>
+
+    <div class="campo">
+      <label for="document">Documento (CPF)</label>
+      <input type="text" id="document" name="document" inputmode="numeric" maxlength="14"
+             placeholder="000.000.000-00">
+      <span class="mensagem-campo" data-erro="document"></span>
+    </div>
+
+    <div class="campo">
+      <label for="addressLine">Rua</label>
+      <input type="text" id="addressLine" name="addressLine" maxlength="150">
+      <span class="mensagem-campo" data-erro="addressLine"></span>
+    </div>
+
+    <div class="campo">
+      <label for="addressNumber">Número</label>
+      <input type="text" id="addressNumber" name="addressNumber" maxlength="10">
+      <span class="mensagem-campo" data-erro="addressNumber"></span>
+    </div>
+
+    <div class="campo">
+      <label for="city">Cidade</label>
+      <input type="text" id="city" name="city" maxlength="80">
+      <span class="mensagem-campo" data-erro="city"></span>
+    </div>
+
+    <div class="campo">
+      <label for="state">Estado</label>
+      <select id="state" name="state">
+        <option value="">Selecione</option>
+        <option>AC</option><option>AL</option><option>AP</option><option>AM</option>
+        <option>BA</option><option>CE</option><option>DF</option><option>ES</option>
+        <option>GO</option><option>MA</option><option>MT</option><option>MS</option>
+        <option>MG</option><option>PA</option><option>PB</option><option>PR</option>
+        <option>PE</option><option>PI</option><option>RJ</option><option>RN</option>
+        <option>RS</option><option>RO</option><option>RR</option><option>SC</option>
+        <option>SP</option><option>SE</option><option>TO</option>
+      </select>
+      <span class="mensagem-campo" data-erro="state"></span>
+    </div>
+
+    <div class="campo">
+      <label for="zip">CEP</label>
+      <input type="text" id="zip" name="zip" inputmode="numeric" maxlength="9" placeholder="00000-000">
+      <span class="mensagem-campo" data-erro="zip"></span>
+    </div>
+
+    <div class="acoes">
+      <button type="submit" id="salvar">Salvar</button>
+      <a href="index.html"><button type="button" class="secundario">Cancelar</button></a>
+    </div>
+  </form>
+</main>
+
+<script src="js/api.js"></script>
+<script src="js/validacao.js"></script>
+<script>
+  const form = document.getElementById('formulario');
+  const botaoSalvar = document.getElementById('salvar');
+  const faixa = document.getElementById('faixa');
+
+  aplicarMascaras(form);
+
+  function mostrarErros(titulo, erros) {
+    faixa.replaceChildren();
+    faixa.appendChild(document.createTextNode(titulo));
+    if (erros.length > 0) {
+      const lista = document.createElement('ul');
+      erros.forEach(function (erro) {
+        const item = document.createElement('li');
+        item.textContent = erro.message;
+        lista.appendChild(item);
+      });
+      faixa.appendChild(lista);
+    }
+    faixa.hidden = false;
+  }
+
+  form.addEventListener('submit', async function (evento) {
+    evento.preventDefault();
+
+    const erros = validarFormulario(form);
+    if (erros.length > 0) {
+      marcarErros(form, erros);
+      mostrarErros('Corrija os campos abaixo:', erros);
+      return;
+    }
+
+    limparErros(form);
+    faixa.hidden = true;
+    botaoSalvar.disabled = true;
+
+    try {
+      await api.criar(lerFormulario(form));
+      // A faixa de sucesso é exibida na listagem, para onde o fluxo volta
+      sessionStorage.setItem('mensagemSucesso', 'Usuário cadastrado com sucesso.');
+      window.location.href = 'index.html';
+    } catch (falha) {
+      // Os dados digitados continuam no formulário para o usuário corrigir
+      marcarErros(form, falha.fields);
+      mostrarErros(falha.message, falha.fields);
+      botaoSalvar.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>

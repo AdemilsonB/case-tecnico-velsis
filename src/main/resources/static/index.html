@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Usuários</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<main>
+  <div class="topo">
+    <h1>Usuários cadastrados</h1>
+    <a href="novo.html"><button type="button">Novo usuário</button></a>
+  </div>
+
+  <div id="faixa" class="faixa sucesso" hidden></div>
+
+  <div id="estado" class="vazio">Carregando...</div>
+
+  <table id="tabela" hidden>
+    <thead>
+    <tr>
+      <th>Nome</th>
+      <th>Documento</th>
+      <th>Nascimento</th>
+      <th>Cidade/UF</th>
+      <th></th>
+    </tr>
+    </thead>
+    <tbody id="corpo"></tbody>
+  </table>
+
+  <div class="paginacao" id="paginacao" hidden>
+    <button type="button" id="anterior" class="secundario">Anterior</button>
+    <span id="indicador"></span>
+    <button type="button" id="proxima" class="secundario">Próxima</button>
+  </div>
+</main>
+
+<script src="js/api.js"></script>
+<script>
+  const TAMANHO_PAGINA = 20;
+  let paginaAtual = 0;
+
+  const faixa = document.getElementById('faixa');
+  const estado = document.getElementById('estado');
+  const tabela = document.getElementById('tabela');
+  const corpo = document.getElementById('corpo');
+  const paginacao = document.getElementById('paginacao');
+
+  // Mensagem gravada pelas telas de cadastro e edição antes de voltar para cá
+  const mensagem = sessionStorage.getItem('mensagemSucesso');
+  if (mensagem) {
+    sessionStorage.removeItem('mensagemSucesso');
+    faixa.textContent = mensagem;
+    faixa.hidden = false;
+  }
+
+  function formatarData(iso) {
+    const partes = iso.split('-');
+    return partes[2] + '/' + partes[1] + '/' + partes[0];
+  }
+
+  function formatarDocumento(documento) {
+    return documento.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4');
+  }
+
+  function montarLinha(usuario) {
+    const tr = document.createElement('tr');
+    [usuario.name, formatarDocumento(usuario.document), formatarData(usuario.birthDate),
+      usuario.city + '/' + usuario.state].forEach(function (valor) {
+      const td = document.createElement('td');
+      td.textContent = valor;
+      tr.appendChild(td);
+    });
+
+    const acao = document.createElement('td');
+    const link = document.createElement('a');
+    link.href = 'editar.html?id=' + usuario.id;
+    link.textContent = 'Editar';
+    acao.appendChild(link);
+    tr.appendChild(acao);
+    return tr;
+  }
+
+  async function carregar(pagina) {
+    estado.textContent = 'Carregando...';
+    estado.hidden = false;
+    tabela.hidden = true;
+    paginacao.hidden = true;
+
+    try {
+      const resultado = await api.listar(pagina, TAMANHO_PAGINA);
+      paginaAtual = resultado.page;
+      corpo.replaceChildren();
+
+      if (resultado.totalElements === 0) {
+        estado.textContent = 'Nenhum usuário cadastrado.';
+        return;
+      }
+
+      resultado.content.forEach(function (usuario) {
+        corpo.appendChild(montarLinha(usuario));
+      });
+      estado.hidden = true;
+      tabela.hidden = false;
+
+      // Paginação só aparece quando existe mais de uma página
+      if (resultado.totalPages > 1) {
+        document.getElementById('indicador').textContent =
+          'Página ' + (resultado.page + 1) + ' de ' + resultado.totalPages;
+        document.getElementById('anterior').disabled = resultado.page === 0;
+        document.getElementById('proxima').disabled = resultado.page >= resultado.totalPages - 1;
+        paginacao.hidden = false;
+      }
+    } catch (erro) {
+      estado.textContent = erro.message;
+      estado.hidden = false;
+    }
+  }
+
+  document.getElementById('anterior').addEventListener('click', function () {
+    carregar(paginaAtual - 1);
+  });
+  document.getElementById('proxima').addEventListener('click', function () {
+    carregar(paginaAtual + 1);
+  });
+
+  carregar(0);
+</script>
+</body>
+</html>
