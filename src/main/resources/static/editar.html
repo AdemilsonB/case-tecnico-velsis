@@ -7,10 +7,14 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+<header class="topo">
+  <span class="marca">VELSIS</span>
+  <span class="sistema">Cadastro de Usuários</span>
+</header>
+
 <main>
-  <div class="topo">
+  <div class="cabecalho">
     <h1>Editar usuário</h1>
-    <a href="index.html"><button type="button" class="secundario">Voltar</button></a>
   </div>
 
   <div id="faixa" class="faixa erro" hidden></div>
@@ -36,15 +40,21 @@
     </div>
 
     <div class="campo">
-      <label for="addressLine">Rua</label>
-      <input type="text" id="addressLine" name="addressLine" maxlength="150">
-      <span class="mensagem-campo" data-erro="addressLine"></span>
+      <label for="zip">CEP</label>
+      <input type="text" id="zip" name="zip" inputmode="numeric" maxlength="9" placeholder="00000-000">
+      <span class="mensagem-campo" data-erro="zip"></span>
     </div>
 
     <div class="campo">
       <label for="addressNumber">Número</label>
       <input type="text" id="addressNumber" name="addressNumber" maxlength="10">
       <span class="mensagem-campo" data-erro="addressNumber"></span>
+    </div>
+
+    <div class="campo campo-largo">
+      <label for="addressLine">Rua</label>
+      <input type="text" id="addressLine" name="addressLine" maxlength="150">
+      <span class="mensagem-campo" data-erro="addressLine"></span>
     </div>
 
     <div class="campo">
@@ -68,15 +78,9 @@
       <span class="mensagem-campo" data-erro="state"></span>
     </div>
 
-    <div class="campo">
-      <label for="zip">CEP</label>
-      <input type="text" id="zip" name="zip" inputmode="numeric" maxlength="9" placeholder="00000-000">
-      <span class="mensagem-campo" data-erro="zip"></span>
-    </div>
-
     <div class="acoes">
-      <button type="submit" id="salvar">Salvar</button>
-      <a href="index.html"><button type="button" class="secundario">Cancelar</button></a>
+      <a href="index.html"><button type="button" class="btn btn-secundario">Cancelar</button></a>
+      <button type="submit" id="salvar" class="btn btn-primario">Salvar</button>
     </div>
   </form>
 
@@ -85,6 +89,7 @@
 
 <script src="js/api.js"></script>
 <script src="js/validacao.js"></script>
+<script src="js/endereco.js"></script>
 <script>
   const form = document.getElementById('formulario');
   const botaoSalvar = document.getElementById('salvar');
@@ -94,18 +99,10 @@
 
   aplicarMascaras(form);
 
-  function mostrarErros(titulo, erros) {
-    faixa.replaceChildren();
-    faixa.appendChild(document.createTextNode(titulo));
-    if (erros.length > 0) {
-      const lista = document.createElement('ul');
-      erros.forEach(function (erro) {
-        const item = document.createElement('li');
-        item.textContent = erro.message;
-        lista.appendChild(item);
-      });
-      faixa.appendChild(lista);
-    }
+  // A mensagem detalhada fica embaixo de cada campo; a faixa só chama a atenção
+  function mostrarFalha(mensagem, erros) {
+    marcarErros(form, erros);
+    faixa.textContent = erros.length > 0 ? 'Corrija os campos destacados abaixo.' : mensagem;
     faixa.hidden = false;
   }
 
@@ -128,8 +125,7 @@
 
     const erros = validarFormulario(form);
     if (erros.length > 0) {
-      marcarErros(form, erros);
-      mostrarErros('Corrija os campos abaixo:', erros);
+      mostrarFalha('', erros);
       return;
     }
 
@@ -142,8 +138,7 @@
       sessionStorage.setItem('mensagemSucesso', 'Usuário atualizado com sucesso.');
       window.location.href = 'index.html';
     } catch (falha) {
-      marcarErros(form, falha.fields);
-      mostrarErros(falha.message, falha.fields);
+      mostrarFalha(falha.message, falha.fields);
       botaoSalvar.disabled = false;
     }
   });

@@ -7,13 +7,24 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+<header class="topo">
+  <span class="marca">VELSIS</span>
+  <span class="sistema">Cadastro de Usuários</span>
+</header>
+
 <main>
-  <div class="topo">
+  <div class="cabecalho">
     <h1>Usuários cadastrados</h1>
-    <a href="novo.html"><button type="button">Novo usuário</button></a>
+    <a href="novo.html"><button type="button" class="btn btn-primario">Novo usuário</button></a>
   </div>
 
   <div id="faixa" class="faixa sucesso" hidden></div>
+
+  <div class="filtro">
+    <input type="text" id="termo" placeholder="Buscar por nome ou documento">
+    <button type="button" id="btnBuscar" class="btn btn-primario">Buscar</button>
+    <button type="button" id="btnLimpar" class="btn btn-secundario">Limpar</button>
+  </div>
 
   <div id="estado" class="vazio">Carregando...</div>
 
@@ -24,16 +35,16 @@
       <th>Documento</th>
       <th>Nascimento</th>
       <th>Cidade/UF</th>
-      <th></th>
+      <th class="acao"></th>
     </tr>
     </thead>
     <tbody id="corpo"></tbody>
   </table>
 
   <div class="paginacao" id="paginacao" hidden>
-    <button type="button" id="anterior" class="secundario">Anterior</button>
-    <span id="indicador"></span>
-    <button type="button" id="proxima" class="secundario">Próxima</button>
+    <button type="button" class="btn btn-secundario seta" id="btnAnterior">&lsaquo;</button>
+    <span class="info" id="indicador"></span>
+    <button type="button" class="btn btn-secundario seta" id="btnProxima">&rsaquo;</button>
   </div>
 </main>
 
@@ -41,12 +52,14 @@
 <script>
   const TAMANHO_PAGINA = 20;
   let paginaAtual = 0;
+  let termoAtual = '';
 
   const faixa = document.getElementById('faixa');
   const estado = document.getElementById('estado');
   const tabela = document.getElementById('tabela');
   const corpo = document.getElementById('corpo');
   const paginacao = document.getElementById('paginacao');
+  const campoTermo = document.getElementById('termo');
 
   // Mensagem gravada pelas telas de cadastro e edição antes de voltar para cá
   const mensagem = sessionStorage.getItem('mensagemSucesso');
@@ -74,28 +87,44 @@
       tr.appendChild(td);
     });
 
-    const acao = document.createElement('td');
-    const link = document.createElement('a');
-    link.href = 'editar.html?id=' + usuario.id;
-    link.textContent = 'Editar';
-    acao.appendChild(link);
-    tr.appendChild(acao);
+    const celula = document.createElement('td');
+    celula.className = 'acao';
+    const botao = document.createElement('button');
+    botao.type = 'button';
+    botao.className = 'btn btn-editar';
+    botao.textContent = 'Editar';
+    botao.addEventListener('click', function () {
+      window.location.href = 'editar.html?id=' + usuario.id;
+    });
+    celula.appendChild(botao);
+    tr.appendChild(celula);
     return tr;
   }
 
-  async function carregar(pagina) {
+  function renderizarPaginacao(pagina, totalPaginas, totalRegistros) {
+    const sufixo = termoAtual ? ' registros encontrados' : ' registros';
+    document.getElementById('indicador').textContent =
+      'Página ' + (pagina + 1) + ' de ' + totalPaginas + ' · ' + totalRegistros + sufixo;
+    document.getElementById('btnAnterior').disabled = pagina === 0;
+    document.getElementById('btnProxima').disabled = pagina >= totalPaginas - 1;
+    paginacao.hidden = false;
+  }
+
+  async function carregar() {
     estado.textContent = 'Carregando...';
     estado.hidden = false;
     tabela.hidden = true;
     paginacao.hidden = true;
 
     try {
-      const resultado = await api.listar(pagina, TAMANHO_PAGINA);
+      const resultado = await api.listar(paginaAtual, TAMANHO_PAGINA, termoAtual);
       paginaAtual = resultado.page;
       corpo.replaceChildren();
 
       if (resultado.totalElements === 0) {
-        estado.textContent = 'Nenhum usuário cadastrado.';
+        estado.textContent = termoAtual
+          ? 'Nenhum usuário encontrado para o termo informado.'
+          : 'Nenhum usuário cadastrado.';
         return;
       }
 
@@ -104,29 +133,46 @@
       });
       estado.hidden = true;
       tabela.hidden = false;
-
-      // Paginação só aparece quando existe mais de uma página
-      if (resultado.totalPages > 1) {
-        document.getElementById('indicador').textContent =
-          'Página ' + (resultado.page + 1) + ' de ' + resultado.totalPages;
-        document.getElementById('anterior').disabled = resultado.page === 0;
-        document.getElementById('proxima').disabled = resultado.page >= resultado.totalPages - 1;
-        paginacao.hidden = false;
-      }
+      renderizarPaginacao(resultado.page, resultado.totalPages, resultado.totalElements);
     } catch (erro) {
       estado.textContent = erro.message;
       estado.hidden = false;
     }
   }
 
-  document.getElementById('anterior').addEventListener('click', function () {
-    carregar(paginaAtual - 1);
+  function buscar() {
+    termoAtual = campoTermo.value.trim();
+    paginaAtual = 0; // busca nova sempre volta para a primeira página
+    carregar();
+  }
+
+  function limpar() {
+    campoTermo.value = '';
+    termoAtual = '';
+    paginaAtual = 0;
+    carregar();
+  }
+
+  function irParaPagina(numero) {
+    paginaAtual = numero; // a paginação preserva o termo buscado
+    carregar();
+  }
+
+  document.getElementById('btnBuscar').addEventListener('click', buscar);
+  document.getElementById('btnLimpar').addEventListener('click', limpar);
+  campoTermo.addEventListener('keydown', function (evento) {
+    if (evento.key === 'Enter') {
+      buscar();
+    }
   });
-  document.getElementById('proxima').addEventListener('click', function () {
-    carregar(paginaAtual + 1);
+  document.getElementById('btnAnterior').addEventListener('click', function () {
+    irParaPagina(paginaAtual - 1);
+  });
+  document.getElementById('btnProxima').addEventListener('click', function () {
+    irParaPagina(paginaAtual + 1);
   });
 
-  carregar(0);
+  carregar();
 </script>
 </body>
 </html>

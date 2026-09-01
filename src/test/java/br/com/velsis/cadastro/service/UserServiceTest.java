@@ -12,13 +12,18 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -97,5 +102,25 @@ class UserServiceTest {
         assertThat(resposta.id()).isEqualTo(7L);
         assertThat(resposta.name()).isEqualTo("Maria Silva");
         assertThat(resposta.document()).isEqualTo("11144477735");
+    }
+
+    @Test
+    void deveListarTudoQuandoOTermoVemVazio() {
+        Page<User> pagina = new PageImpl<>(List.of(new User()));
+        when(repository.findAll(any(Pageable.class))).thenReturn(pagina);
+
+        service.listar("   ", 0, 20);
+
+        verify(repository, never()).buscarPorTermo(any(), any(Pageable.class));
+    }
+
+    @Test
+    void deveFiltrarPeloTermoSemEspacosAoRedor() {
+        Page<User> pagina = new PageImpl<>(List.of(new User()));
+        when(repository.buscarPorTermo(eq("maria"), any(Pageable.class))).thenReturn(pagina);
+
+        service.listar("  maria  ", 0, 20);
+
+        verify(repository, never()).findAll(any(Pageable.class));
     }
 }

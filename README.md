@@ -67,7 +67,8 @@ http://localhost:8080
 
 Telas disponíveis:
 
-- `/` listagem de usuários (página principal, com paginação de 20 registros)
+- `/` listagem de usuários (página principal, com busca por nome ou documento
+  e paginação de 20 registros)
 - `/novo.html` cadastro
 - `/editar.html?id=N` edição
 
@@ -78,13 +79,14 @@ Telas disponíveis:
 ```
 
 Cobrem as regras do `UserService`: cadastro válido, documento duplicado,
-edição de id inexistente e edição preservando o id.
+edição de id inexistente, edição preservando o id e o desvio entre listagem
+completa e listagem filtrada.
 
 ## 6. Endpoints
 
 | Método | Rota | Sucesso | Erros |
 |---|---|---|---|
-| GET | `/api/users?page=0&size=20` | 200 com a página | |
+| GET | `/api/users?termo=&page=0&size=20` | 200 com a página | |
 | GET | `/api/users/{id}` | 200 com o usuário | 404 |
 | POST | `/api/users` | 201 com header `Location` | 400, 409 |
 | PUT | `/api/users/{id}` | 200 com o usuário | 400, 404, 409 |
@@ -132,11 +134,34 @@ independente de como o valor foi digitado.
 **Sem Lombok.** Getters e setters escritos à mão na entidade e `record` nos
 DTOs. O projeto compila em qualquer IDE sem instalar plugin.
 
+A exclusão de registros não foi implementada por não constar no escopo
+definido (criar, listar e editar). Caso fosse requisito, a abordagem proposta
+seria exclusão lógica, com uma coluna de data de desativação e filtro na
+consulta de listagem, preservando o histórico do cadastro em vez de remover a
+linha fisicamente.
+
+Acrescentei restrição de unicidade na coluna document. O enunciado especifica
+as colunas da tabela, mas não as restrições; considerei que permitir dois
+cadastros com o mesmo CPF seria um defeito funcional. A violação é tratada e
+devolve mensagem clara ao usuário.
+
+Acrescentei um filtro por nome ou documento na listagem. O próprio enunciado
+prevê o cenário de mais de 20 registros ao pedir paginação, e a partir desse
+volume a tela de listagem perde utilidade sem uma forma de localizar o
+cadastro. Optei por refinar uma tela que já era requisito, e não por
+acrescentar operações fora do escopo definido.
+
+A tela de cadastro consulta o serviço público ViaCEP para preencher
+logradouro, cidade e estado a partir do CEP informado. A consulta é feita
+diretamente pelo navegador e é não bloqueante: se o serviço estiver
+indisponível ou o CEP não for encontrado, os campos permanecem editáveis e o
+cadastro segue normalmente. A aplicação não depende de acesso externo para
+funcionar.
+
 ## 8. O que ficou de fora, de propósito
 
 - **Exclusão de usuário.** O enunciado pede criar, listar e editar. Não existe
   `DELETE` na API nem botão de excluir na listagem.
-- **Busca e filtro na listagem.** Não foram pedidos.
 - **Autenticação.** Fora do escopo do case.
 - **Flyway/Liquibase, Docker, cache.** Somariam configuração sem atender a
   nenhum requisito do enunciado.

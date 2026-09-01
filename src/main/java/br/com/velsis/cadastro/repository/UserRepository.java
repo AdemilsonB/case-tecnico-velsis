@@ -1,11 +1,16 @@
 package br.com.velsis.cadastro.repository;
 
 import br.com.velsis.cadastro.model.User;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 /**
  * Acesso à tabela users. O CRUD e a paginação já vêm do JpaRepository;
- * aqui ficam apenas as consultas usadas pela regra de documento único.
+ * aqui ficam apenas as consultas da regra de documento único e do filtro
+ * da listagem.
  */
 public interface UserRepository extends JpaRepository<User, Long> {
 
@@ -13,4 +18,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     // Usado na edição: o próprio registro não pode acusar duplicidade contra ele mesmo
     boolean existsByDocumentAndIdNot(String document, Long id);
+
+    // LIKE com curinga à esquerda não aproveita índice. É aceitável no volume
+    // deste cadastro; em base grande a saída seria busca full-text
+    @Query("select u from User u "
+            + "where lower(u.name) like lower(concat('%', :termo, '%')) "
+            + "   or u.document like concat('%', :termo, '%')")
+    Page<User> buscarPorTermo(@Param("termo") String termo, Pageable pageable);
 }

@@ -33,8 +33,12 @@ async function enviar(url, opcoes) {
 }
 
 const api = {
-  listar(pagina, tamanho) {
-    return enviar(`${BASE}?page=${pagina}&size=${tamanho}`, { method: 'GET' });
+  listar(pagina, tamanho, termo) {
+    const parametros = new URLSearchParams({ page: pagina, size: tamanho });
+    if (termo) {
+      parametros.append('termo', termo);
+    }
+    return enviar(`${BASE}?${parametros}`, { method: 'GET' });
   },
 
   buscar(id) {

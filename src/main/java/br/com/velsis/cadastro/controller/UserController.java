@@ -34,9 +34,10 @@ public class UserController {
 
     @GetMapping
     public PageResponse<UserResponse> listar(
+            @RequestParam(required = false) String termo,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return service.listar(page, size);
+        return service.listar(termo, page, size);
     }
 
     @GetMapping("/{id}")

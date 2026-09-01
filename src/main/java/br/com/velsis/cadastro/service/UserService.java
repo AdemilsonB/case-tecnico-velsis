@@ -31,12 +31,19 @@ public class UserService {
     }
 
     /**
-     * Lista os usuários paginados, do mais recente para o mais antigo.
+     * Lista os usuários paginados, em ordem alfabética. Quando o termo é
+     * informado, filtra por nome ou documento.
      */
     @Transactional(readOnly = true)
-    public PageResponse<UserResponse> listar(int page, int size) {
-        Page<User> pagina = repository.findAll(
-                PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id")));
+    public PageResponse<UserResponse> listar(String termo, int page, int size) {
+        PageRequest paginacao = PageRequest.of(page, size, Sort.by("name"));
+        Page<User> pagina;
+
+        if (termo == null || termo.isBlank()) {
+            pagina = repository.findAll(paginacao);
+        } else {
+            pagina = repository.buscarPorTermo(termo.trim(), paginacao);
+        }
 
         List<UserResponse> conteudo = pagina.getContent().stream()
                 .map(mapper::paraResposta)
