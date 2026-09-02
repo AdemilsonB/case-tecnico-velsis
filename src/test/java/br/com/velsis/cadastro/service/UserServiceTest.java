@@ -111,16 +111,48 @@ class UserServiceTest {
 
         service.listar("   ", 0, 20);
 
-        verify(repository, never()).buscarPorTermo(any(), any(Pageable.class));
+        verify(repository, never()).buscarPorTermo(any(), any(), any(Pageable.class));
     }
 
     @Test
     void deveFiltrarPeloTermoSemEspacosAoRedor() {
         Page<User> pagina = new PageImpl<>(List.of(new User()));
-        when(repository.buscarPorTermo(eq("maria"), any(Pageable.class))).thenReturn(pagina);
+        when(repository.buscarPorTermo(eq("maria"), any(), any(Pageable.class))).thenReturn(pagina);
 
         service.listar("  maria  ", 0, 20);
 
         verify(repository, never()).findAll(any(Pageable.class));
+    }
+
+    /**
+     * A tela mostra o documento com máscara, mas o banco guarda só os dígitos.
+     * Copiar o CPF da listagem e colar na busca precisa encontrar o registro.
+     */
+    @Test
+    void deveBuscarPeloDocumentoAindaQueOTermoVenhaComMascara() {
+        Page<User> pagina = new PageImpl<>(List.of(new User()));
+        when(repository.buscarPorTermo(any(), any(), any(Pageable.class))).thenReturn(pagina);
+
+        service.listar("390.120.000-25", 0, 20);
+
+        ArgumentCaptor<String> documento = ArgumentCaptor.forClass(String.class);
+        verify(repository).buscarPorTermo(eq("390.120.000-25"), documento.capture(), any(Pageable.class));
+        assertThat(documento.getValue()).isEqualTo("39012000025");
+    }
+
+    /**
+     * Sem dígito nenhum no termo, a comparação do documento não pode virar
+     * "like '%%'", que casaria com a base inteira.
+     */
+    @Test
+    void naoDeveCompararDocumentoComTermoVazioQuandoABuscaEPorNome() {
+        Page<User> pagina = new PageImpl<>(List.of(new User()));
+        when(repository.buscarPorTermo(any(), any(), any(Pageable.class))).thenReturn(pagina);
+
+        service.listar("maria", 0, 20);
+
+        ArgumentCaptor<String> documento = ArgumentCaptor.forClass(String.class);
+        verify(repository).buscarPorTermo(eq("maria"), documento.capture(), any(Pageable.class));
+        assertThat(documento.getValue()).isNotEmpty();
     }
 }

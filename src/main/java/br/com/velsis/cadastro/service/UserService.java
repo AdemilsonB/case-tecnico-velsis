@@ -42,7 +42,8 @@ public class UserService {
         if (termo == null || termo.isBlank()) {
             pagina = repository.findAll(paginacao);
         } else {
-            pagina = repository.buscarPorTermo(termo.trim(), paginacao);
+            String termoLimpo = termo.trim();
+            pagina = repository.buscarPorTermo(termoLimpo, digitosDoDocumento(termoLimpo), paginacao);
         }
 
         List<UserResponse> conteudo = pagina.getContent().stream()
@@ -51,6 +52,20 @@ public class UserService {
 
         return new PageResponse<>(conteudo, pagina.getNumber(), pagina.getSize(),
                 pagina.getTotalElements(), pagina.getTotalPages());
+    }
+
+    /**
+     * O documento é gravado apenas com dígitos, mas a listagem o exibe com
+     * máscara e nada impede que a pessoa copie de lá e cole na busca. Sem
+     * remover os pontos e o traço, procurar por "390.120.000-25" nunca
+     * encontraria "39012000025".
+     */
+    private String digitosDoDocumento(String termo) {
+        String digitos = termo.replaceAll("\\D", "");
+        // Termo sem dígito algum é busca por nome. Devolver o próprio termo faz a
+        // comparação do documento não casar com nada, que é o resultado correto;
+        // devolver vazio viraria "like '%%'" e traria a base inteira.
+        return digitos.isEmpty() ? termo : digitos;
     }
 
     @Transactional(readOnly = true)

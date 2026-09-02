@@ -19,10 +19,16 @@ public interface UserRepository extends JpaRepository<User, Long> {
     // Usado na edição: o próprio registro não pode acusar duplicidade contra ele mesmo
     boolean existsByDocumentAndIdNot(String document, Long id);
 
+    // São dois parâmetros porque as colunas guardam formatos diferentes: o nome
+    // é comparado com o texto digitado, e o documento com os dígitos extraídos
+    // dele, já que a coluna document não tem máscara. Quem monta os dois é o
+    // serviço; aqui a consulta só recebe os valores prontos.
     // LIKE com curinga à esquerda não aproveita índice. É aceitável no volume
     // deste cadastro; em base grande a saída seria busca full-text
     @Query("select u from User u "
             + "where lower(u.name) like lower(concat('%', :termo, '%')) "
-            + "   or u.document like concat('%', :termo, '%')")
-    Page<User> buscarPorTermo(@Param("termo") String termo, Pageable pageable);
+            + "   or u.document like concat('%', :documento, '%')")
+    Page<User> buscarPorTermo(@Param("termo") String termo,
+                              @Param("documento") String documento,
+                              Pageable pageable);
 }
