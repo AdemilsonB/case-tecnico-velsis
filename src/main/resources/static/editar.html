@@ -17,7 +17,7 @@
     <h1>Editar usuário</h1>
   </div>
 
-  <div id="faixa" class="faixa erro" hidden></div>
+  <div id="faixa" class="faixa" role="status" hidden></div>
 
   <form id="formulario" novalidate hidden>
     <div class="campo campo-largo">
@@ -79,7 +79,7 @@
     </div>
 
     <div class="acoes">
-      <a href="index.html"><button type="button" class="btn btn-secundario">Cancelar</button></a>
+      <a href="index.html"><button type="button" id="cancelar" class="btn btn-secundario">Cancelar</button></a>
       <button type="submit" id="salvar" class="btn btn-primario">Salvar</button>
     </div>
   </form>
@@ -90,11 +90,13 @@
 <script src="js/api.js"></script>
 <script src="js/validacao.js"></script>
 <script src="js/endereco.js"></script>
+<script src="js/feedback.js"></script>
 <script>
   const form = document.getElementById('formulario');
   const botaoSalvar = document.getElementById('salvar');
   const faixa = document.getElementById('faixa');
   const estado = document.getElementById('estado');
+  const botaoCancelar = document.getElementById('cancelar');
   const id = new URLSearchParams(window.location.search).get('id');
 
   aplicarMascaras(form);
@@ -102,8 +104,7 @@
   // A mensagem detalhada fica embaixo de cada campo; a faixa só chama a atenção
   function mostrarFalha(mensagem, erros) {
     marcarErros(form, erros);
-    faixa.textContent = erros.length > 0 ? 'Corrija os campos destacados abaixo.' : mensagem;
-    faixa.hidden = false;
+    mostrarErro(faixa, erros.length > 0 ? 'Corrija os campos destacados abaixo.' : mensagem);
   }
 
   async function carregar() {
@@ -130,15 +131,21 @@
     }
 
     limparErros(form);
-    faixa.hidden = true;
+    esconderFaixa(faixa);
     botaoSalvar.disabled = true;
 
     try {
-      await api.atualizar(id, lerFormulario(form));
-      sessionStorage.setItem('mensagemSucesso', 'Usuário atualizado com sucesso.');
-      window.location.href = 'index.html';
+      // Diferente do cadastro, a edição não sai da tela: quem está corrigindo
+      // um registro costuma querer ajustar mais de um campo, e ser levado de
+      // volta para a listagem a cada gravação obrigaria a navegar de novo.
+      // O retorno para a listagem fica no botão ao lado, quando a pessoa quiser.
+      preencherFormulario(form, await api.atualizar(id, lerFormulario(form)));
+      mostrarSucesso(faixa, 'Usuário atualizado com sucesso.');
+      // Depois de gravar não há mais o que cancelar; o botão passa a ser a saída
+      botaoCancelar.textContent = 'Voltar';
     } catch (falha) {
       mostrarFalha(falha.message, falha.fields);
+    } finally {
       botaoSalvar.disabled = false;
     }
   });

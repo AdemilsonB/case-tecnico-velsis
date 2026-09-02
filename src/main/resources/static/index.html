@@ -18,7 +18,7 @@
     <a href="novo.html"><button type="button" class="btn btn-primario">Novo usuário</button></a>
   </div>
 
-  <div id="faixa" class="faixa sucesso" hidden></div>
+  <div id="faixa" class="faixa" role="status" hidden></div>
 
   <div class="filtro">
     <input type="text" id="termo" placeholder="Buscar por nome ou documento">
@@ -49,6 +49,7 @@
 </main>
 
 <script src="js/api.js"></script>
+<script src="js/feedback.js"></script>
 <script>
   const TAMANHO_PAGINA = 20;
   let paginaAtual = 0;
@@ -61,12 +62,12 @@
   const paginacao = document.getElementById('paginacao');
   const campoTermo = document.getElementById('termo');
 
-  // Mensagem gravada pelas telas de cadastro e edição antes de voltar para cá
+  // Mensagem gravada pela tela de cadastro antes de voltar para cá. É lida uma
+  // única vez: sem o remove ela reapareceria a cada recarga da listagem.
   const mensagem = sessionStorage.getItem('mensagemSucesso');
   if (mensagem) {
     sessionStorage.removeItem('mensagemSucesso');
-    faixa.textContent = mensagem;
-    faixa.hidden = false;
+    mostrarSucesso(faixa, mensagem);
   }
 
   function formatarData(iso) {

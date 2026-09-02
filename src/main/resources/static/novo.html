@@ -17,7 +17,7 @@
     <h1>Novo usuário</h1>
   </div>
 
-  <div id="faixa" class="faixa erro" hidden></div>
+  <div id="faixa" class="faixa" role="status" hidden></div>
 
   <form id="formulario" novalidate>
     <div class="campo campo-largo">
@@ -88,6 +88,7 @@
 <script src="js/api.js"></script>
 <script src="js/validacao.js"></script>
 <script src="js/endereco.js"></script>
+<script src="js/feedback.js"></script>
 <script>
   const form = document.getElementById('formulario');
   const botaoSalvar = document.getElementById('salvar');
@@ -98,8 +99,7 @@
   // A mensagem detalhada fica embaixo de cada campo; a faixa só chama a atenção
   function mostrarFalha(mensagem, erros) {
     marcarErros(form, erros);
-    faixa.textContent = erros.length > 0 ? 'Corrija os campos destacados abaixo.' : mensagem;
-    faixa.hidden = false;
+    mostrarErro(faixa, erros.length > 0 ? 'Corrija os campos destacados abaixo.' : mensagem);
   }
 
   form.addEventListener('submit', async function (evento) {
@@ -112,12 +112,16 @@
     }
 
     limparErros(form);
-    faixa.hidden = true;
+    esconderFaixa(faixa);
     botaoSalvar.disabled = true;
 
     try {
       await api.criar(lerFormulario(form));
-      // A faixa de sucesso é exibida na listagem, para onde o fluxo volta
+      // Ao contrário da edição, o cadastro sai da tela ao terminar: o formulário
+      // ficaria com um documento que acabou de ser gravado, e um segundo Salvar
+      // esbarraria na restrição de unicidade. Voltar para a listagem também
+      // mostra o registro recém-criado já na tabela. Como a página muda, a
+      // mensagem viaja pelo sessionStorage e é exibida do outro lado.
       sessionStorage.setItem('mensagemSucesso', 'Usuário cadastrado com sucesso.');
       window.location.href = 'index.html';
     } catch (falha) {
