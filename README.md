@@ -78,9 +78,14 @@ Telas disponíveis:
 ./mvnw test
 ```
 
-Cobrem as regras do `UserService`: cadastro válido, documento duplicado,
-edição de id inexistente, edição preservando o id e o desvio entre listagem
-completa e listagem filtrada.
+São oito testes unitários sobre o `UserService`, com o repositório mockado. O
+alvo é a regra de negócio e não a infraestrutura, então nenhum deles sobe
+contexto do Spring nem precisa de banco no ar. Cobrem o cadastro válido, a
+recusa de documento duplicado, a edição de um id inexistente, a edição
+preservando o id, e quatro casos do filtro da listagem: termo vazio caindo em
+`findAll`, termo com espaços em volta, busca por documento mascarado, e o
+cuidado para que um termo sem dígitos não vire uma comparação que casa com a
+base inteira.
 
 ## 6. Endpoints
 
@@ -107,61 +112,141 @@ Todo erro devolve o mesmo formato, o que permite ao frontend tratar 400, 404,
 
 ## 7. Decisões técnicas
 
-**Java 17 em vez de 21.** O enunciado pede Java 8 ou superior. 17 é o LTS
-efetivamente presente nos parques corporativos hoje, o que faz mais sentido
-para um sistema que vai conviver com aplicações existentes.
+Registro aqui o raciocínio por trás das escolhas que não eram óbvias, incluindo
+as alternativas que considerei e descartei.
 
-**Schema por script, com `ddl-auto=validate`.** O `schema.sql` é a fonte da
-estrutura da tabela e o Hibernate apenas confere a entidade contra ela na
-subida. Assim o banco nunca é alterado sozinho por causa de uma mudança de
-código, e uma divergência aparece na inicialização, não em produção.
+### Java 17, e não 8 nem 21
 
-**Endereço achatado na tabela `users`.** As colunas são exatamente as do
-enunciado (`address_line`, `address_number`, `city`, `state`, `zip`). Uma
-tabela `address` separada só faria sentido se um usuário pudesse ter mais de
-um endereço, o que não foi pedido.
+O enunciado aceita da 8 para cima. Fiquei no 17 por ser o LTS que a maior parte
+dos ambientes corporativos já roda, e porque ele me dá `record` para os DTOs sem
+trazer dependência nenhuma: os oito campos do formulário viram um tipo imutável
+em poucas linhas. Não subi para o 21 porque o ganho seria pequeno e aumentaria a
+chance de esbarrar em uma JDK mais antiga na máquina de quem for rodar o projeto.
 
-**Validação duplicada de propósito.** A mesma regra existe em
-`validacao.js` e em `UserRequest`, com as mesmas mensagens. O frontend evita
-uma ida ao servidor; o backend não pode confiar no que chega da rede, porque a
-API também responde fora do navegador. Vale inclusive para o dígito
-verificador do CPF, implementado nos dois lados.
+### O schema é um script, e o Hibernate só confere
 
-**Documento gravado só com dígitos.** A máscara é apresentação e fica no
-frontend. No banco fica `52998224725`, o que mantém a chave única consistente
-independente de como o valor foi digitado.
+Coloquei a estrutura da tabela em `schema.sql` e deixei o Hibernate em
+`ddl-auto=validate`. A alternativa cômoda seria `update`, que cria e altera a
+tabela sozinho durante o desenvolvimento; descartei porque ela deixa o banco à
+mercê de qualquer mudança de anotação na entidade, e esse tipo de erro costuma
+aparecer tarde, quando já existe dado dentro. Com `validate` eu pago o preço de
+escrever o DDL à mão e ganho em troca uma garantia: se a entidade e a tabela
+divergirem, a aplicação nem sobe. Descubro na inicialização, não em produção.
 
-**Sem Lombok.** Getters e setters escritos à mão na entidade e `record` nos
-DTOs. O projeto compila em qualquer IDE sem instalar plugin.
+Isso cobrou o preço logo de início. Declarei `state` como `CHAR(2)`, o Hibernate
+esperava `VARCHAR` e a validação derrubava a subida. Resolvi com
+`@JdbcTypeCode(SqlTypes.CHAR)` no campo da entidade, e não afrouxando a coluna
+para `VARCHAR(2)`, porque prefiro que o banco continue descrevendo o dado como
+ele é — uma sigla de exatamente dois caracteres.
 
-A exclusão de registros não foi implementada por não constar no escopo
-definido (criar, listar e editar). Caso fosse requisito, a abordagem proposta
-seria exclusão lógica, com uma coluna de data de desativação e filtro na
-consulta de listagem, preservando o histórico do cadastro em vez de remover a
-linha fisicamente.
+### Endereço nas colunas da própria tabela `users`
 
-Acrescentei restrição de unicidade na coluna document. O enunciado especifica
-as colunas da tabela, mas não as restrições; considerei que permitir dois
-cadastros com o mesmo CPF seria um defeito funcional. A violação é tratada e
-devolve mensagem clara ao usuário.
+Mantive `address_line`, `address_number`, `city`, `state` e `zip` dentro de
+`users`, como o enunciado desenha. Cheguei a considerar uma tabela `address`
+separada, que é o desenho certo quando um usuário pode ter vários endereços —
+cobrança, entrega, e por aí vai. Aqui a relação é de um para um e não há
+requisito de histórico, então a tabela separada acrescentaria um join a toda
+consulta em troca de uma flexibilidade que ninguém pediu.
 
-Acrescentei um filtro por nome ou documento na listagem. O próprio enunciado
-prevê o cenário de mais de 20 registros ao pedir paginação, e a partir desse
-volume a tela de listagem perde utilidade sem uma forma de localizar o
-cadastro. Optei por refinar uma tela que já era requisito, e não por
-acrescentar operações fora do escopo definido.
+### CPF de verdade, e não um documento genérico
 
-A tela de cadastro consulta o serviço público ViaCEP para preencher
-logradouro, cidade e estado a partir do CEP informado. A consulta é feita
-diretamente pelo navegador e é não bloqueante: se o serviço estiver
-indisponível ou o CEP não for encontrado, os campos permanecem editáveis e o
-cadastro segue normalmente. A aplicação não depende de acesso externo para
-funcionar.
+O enunciado fala em "Documento (CPF/ID)", o que permitiria aceitar qualquer
+texto. Preferi implementar o CPF com o cálculo dos dois dígitos verificadores,
+porque validar "o formato do documento" sem regra nenhuma vira só uma checagem
+de campo preenchido, e deixaria passar erro de digitação que o sistema tinha
+como pegar. A contrapartida é que hoje o cadastro não aceita outro tipo de
+documento; sinalizo isso no rótulo do campo e no placeholder, para que não
+pareça defeito. Se fosse preciso aceitar RG ou passaporte, o caminho seria um
+campo de tipo de documento ao lado, escolhendo o validador conforme a opção.
 
-## 8. O que ficou de fora, de propósito
+### A mesma validação nos dois lados, com as mesmas mensagens
 
-- **Exclusão de usuário.** O enunciado pede criar, listar e editar. Não existe
-  `DELETE` na API nem botão de excluir na listagem.
-- **Autenticação.** Fora do escopo do case.
-- **Flyway/Liquibase, Docker, cache.** Somariam configuração sem atender a
-  nenhum requisito do enunciado.
+As regras de `validacao.js` e as anotações de `UserRequest` são espelhadas, e o
+cálculo do dígito verificador está escrito duas vezes, em Java e em JavaScript.
+Duplicar código incomoda, mas as duas cópias respondem a perguntas diferentes: o
+frontend evita uma ida ao servidor por um erro que dá para apontar na hora, e o
+backend não pode confiar no que chega pela rede, porque a API atende também fora
+do navegador. Mantive as mensagens idênticas de propósito — o usuário lê a mesma
+frase venha o erro de onde vier.
+
+### O documento é gravado só com dígitos
+
+A máscara é apresentação e ficou no frontend; no banco `52998224725` é gravado
+sem pontuação. Isso mantém a restrição de unicidade consistente
+independentemente de como o valor foi digitado, e evita ter que eleger qual das
+formas mascaradas seria a canônica.
+
+Essa escolha teve uma consequência que só apareceu no uso. Quem copia o CPF da
+listagem, onde ele aparece formatado, e cola no campo de busca, estaria
+procurando `390.120.000-25` numa coluna que guarda `39012000025` — e não
+encontrava nada. O `UserService` passou a extrair os dígitos do termo antes de
+consultar: o nome é comparado com o texto digitado e o documento com os dígitos
+extraídos dele. O cuidado extra ali é que um termo sem dígito algum não pode
+virar uma comparação vazia, que casaria com a base inteira.
+
+### O cadastro sai da tela, a edição fica
+
+São operações com ritmos diferentes. Cadastrar encerra uma tarefa: depois do 201
+o formulário ficaria exibindo um documento que acabou de ser gravado, e um
+segundo Salvar esbarraria na unicidade — então a tela volta para a listagem
+levando a confirmação. Editar é outra coisa: quem abriu um registro para
+corrigir um campo costuma querer ajustar mais um em seguida, e ser devolvido à
+listagem a cada gravação obrigaria a navegar de novo. Por isso a edição
+permanece onde está, mostra a confirmação ali mesmo, e o botão ao lado — que era
+"Cancelar" enquanto ainda havia o que cancelar — passa a ser "Voltar".
+
+### A confirmação some sozinha, o erro não
+
+A faixa de sucesso desaparece depois de alguns segundos, porque confirma algo
+que já terminou e não precisa seguir ocupando o topo da tela. A de erro fica até
+a pessoa agir: uma mensagem de validação que evapora no meio da leitura esconde
+justamente a informação de que o usuário precisa. As duas passam pelo mesmo
+`feedback.js`, que marca a faixa com `role="status"` para que um leitor de tela
+anuncie o texto antes de ele sumir.
+
+### Restrição de unicidade no documento
+
+O enunciado lista as colunas da tabela, mas não fala de restrições. Acrescentei
+`uk_users_document` porque dois cadastros com o mesmo CPF seriam um defeito
+funcional, não uma liberdade. A violação também não vaza como erro de banco: o
+serviço verifica antes de gravar e o `GlobalExceptionHandler` traduz para 409
+com uma mensagem que a tela sabe exibir no campo certo.
+
+### Filtro na listagem
+
+A paginação já pressupõe mais de 20 registros, e a partir desse volume uma
+listagem sem busca perde utilidade — achar alguém vira uma caçada de página em
+página. Preferi refinar uma tela que já era requisito a acrescentar operações
+fora do escopo. A busca é um `LIKE` com curinga dos dois lados, que não aproveita
+índice; no volume deste cadastro isso é irrelevante, e deixei anotado no
+repositório que a saída em base grande seria busca full-text.
+
+### Busca de CEP pelo ViaCEP
+
+A tela de cadastro consulta o ViaCEP para preencher rua, cidade e estado a
+partir do CEP digitado. É uma conveniência, não uma dependência: a chamada sai
+do próprio navegador e, se o serviço estiver fora do ar ou o CEP não existir, os
+campos continuam editáveis e o cadastro segue normalmente. A aplicação não
+precisa de acesso externo para funcionar.
+
+### Sem Lombok
+
+Getters e setters escritos à mão na entidade, `record` nos DTOs. Lombok
+economizaria linhas, mas exige plugin instalado na IDE, e não quis que a
+primeira impressão do projeto fosse um erro de compilação em uma máquina que não
+tem esse plugin.
+
+## 8. O que não entrou
+
+**Exclusão de usuário.** O escopo é criar, listar e editar, então não há `DELETE`
+na API nem botão na listagem. Se fosse necessário, eu iria de exclusão lógica —
+uma coluna de data de desativação e um filtro na consulta de listagem — em vez
+de apagar a linha, para preservar o histórico do cadastro.
+
+**Autenticação.** Fora do escopo do case, e fazer pela metade seria pior do que
+não fazer.
+
+**Flyway, Docker, cache.** São coisas que eu levaria para um projeto que vai
+crescer e ser mantido por várias pessoas. Aqui acrescentariam configuração e
+passos de execução sem resolver nenhum problema que o case apresenta, e
+atrapalhariam justamente o "rodar localmente" que o README precisa entregar.
