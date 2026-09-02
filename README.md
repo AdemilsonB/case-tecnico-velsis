@@ -35,6 +35,20 @@ psql -U postgres -c "CREATE DATABASE cadastro_usuarios;"
 A tabela `users` **não** precisa ser criada à mão: o arquivo
 `src/main/resources/schema.sql` é executado na subida da aplicação.
 
+Junto com ele roda o `src/main/resources/data.sql`, que insere 25 usuários
+fictícios. É o suficiente para a listagem passar de uma página e a paginação
+ficar visível sem precisar cadastrar nada à mão. Os CPFs são inventados, mas
+têm dígito verificador válido, então qualquer um desses registros pode ser
+aberto na tela de edição e salvo normalmente.
+
+O script é repetível: subir a aplicação de novo não duplica os registros nem
+mexe no que foi cadastrado pela tela. Para começar com a base vazia, apague o
+`data.sql` antes de subir, ou limpe a tabela:
+
+```sql
+TRUNCATE TABLE users RESTART IDENTITY;
+```
+
 ## 2. Configuração da conexão
 
 Ajuste, se necessário, `src/main/resources/application.properties`:
@@ -138,6 +152,20 @@ esperava `VARCHAR` e a validação derrubava a subida. Resolvi com
 `@JdbcTypeCode(SqlTypes.CHAR)` no campo da entidade, e não afrouxando a coluna
 para `VARCHAR(2)`, porque prefiro que o banco continue descrevendo o dado como
 ele é — uma sigla de exatamente dois caracteres.
+
+### A massa de teste entra pelo `data.sql`, e não por um endpoint
+
+Precisava de mais de 20 registros para que a paginação aparecesse de imediato
+para quem for avaliar. Considerei expor um endpoint que popula a base sob
+demanda e descartei: seria código de produção existindo só para teste, e um
+endpoint que escreve em massa não deveria estar publicado de qualquer forma.
+O `data.sql` resolve pelo mecanismo que o próprio Spring Boot oferece, roda
+junto com o `schema.sql` e some da aplicação em si.
+
+Usei `ON CONFLICT (document) DO NOTHING` porque o script roda a cada subida.
+Sem isso, a segunda inicialização quebraria na restrição de unicidade do
+documento e derrubaria a aplicação — o mesmo `spring.sql.init.mode=always` que
+torna a carga automática é o que exige que ela seja repetível.
 
 ### Endereço nas colunas da própria tabela `users`
 
